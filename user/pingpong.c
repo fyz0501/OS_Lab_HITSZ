@@ -4,10 +4,10 @@
 
 int main(int argc,char* argv[]){
     int p1[2],p2[2];
-    int ret1,ret2;
+   int ret1,ret2;
     ret1 = pipe(p1);
     ret2 = pipe(p2);
-    char temp[100];
+    char temp[5];
 	if(ret1<0||ret2<0)
 	{
 		printf("error");
@@ -20,13 +20,12 @@ int main(int argc,char* argv[]){
 	{
 		close(p1[0]);//关闭管道1的读端口
         close(p2[1]);//关闭管道2的写端口
-        sleep(2);
         write(p1[1],"ping",strlen("ping"));
         close(p1[1]);//写入完成，关闭管道1的写端口
-        //wait();
-        read(p2[0],temp,100);
-        int cur_pid = getpid();
-        printf("%d：received %s\n",cur_pid,temp);
+        if (read(p2[0],temp,5)>0){
+            int father_pid = getpid();
+            printf("%d: received %s\n",father_pid,temp);
+        }
         close(p2[0]);//读取完成，关闭管道2的读端口
         
 	}
@@ -34,13 +33,14 @@ int main(int argc,char* argv[]){
 	{
 		close(p1[1]);//关闭管道1写端口
         close(p2[0]);//关闭管道2读端口
-		read(p1[0],temp,100);
-        int cur_pid = getpid();
-        printf("%d：received %s\n",cur_pid,temp);
-        close(p1[0]);//读取完成，关闭管道1读端口
+		if(read(p1[0],temp,5)>0){
+            int child_pid = getpid();
+            printf("%d: received %s\n",child_pid,temp);
+        }
+        close(p1[0]);//读取完成，关闭管道1读端口d
         write(p2[1],"pong",strlen("pong"));
         close(p2[1]);//写入完成，关闭管道2的写端口
 
 	}
-	return 0;
+	exit(0);
 }
