@@ -26,7 +26,7 @@ void main(int argc,char* argv[]){
             if(n!=0){
                 printf("prime %d\n",n);
             }
-            close(p[n][1]);//写入完成，关闭左边管道的写端口
+            close(p[n][1]);//写入完成，关闭父进程管道的写端口
             wait(0);
             exit(0);
         }
@@ -42,12 +42,12 @@ void main(int argc,char* argv[]){
                     i++;
                 }
                     len_primes = i-1;//更新最新的primes数组的长度
-                    n = primes[0];
+                    n = primes[0];//令n等于下一轮需要输出的质数
             }
             else{
                 n = 0;
             }
-            close(p[last_n][0]);//关闭子进程的读端口
+            close(p[last_n][0]);//关闭子进程管道的读端口
         }
     }
     exit(0);
