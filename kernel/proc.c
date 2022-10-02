@@ -150,6 +150,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  p->pcb_mask = 0;//reset pcb_mask
 }
 
 // Create a user page table for a given process,
@@ -294,6 +296,8 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
+  //将pcb_mask信息传给子进程
+  np->pcb_mask = p->pcb_mask;
 
   release(&np->lock);
 

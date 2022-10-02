@@ -95,3 +95,13 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_trace(void){
+    int mask;
+    if(argint(0, &mask)<0){//通过argint获取mask的值，如果返回值小于零则异常返回
+      return -1;
+    }
+    myproc()->pcb_mask = mask;
+    return 0;
+}
