@@ -697,3 +697,34 @@ procdump(void)
     printf("\n");
   }
 }
+
+uint64
+proc_cal(void)//参考上方allocproc代码写出空闲进程数量计算函数
+{
+  uint64 cnt = 0;
+  struct proc *p;
+  for(p = proc;p<&proc[NPROC];p++){
+    acquire(&p->lock);
+    if(p->state == UNUSED){
+      cnt++;
+    }
+    release(&p->lock);
+  }
+  return cnt;
+}
+
+
+uint64
+fd_cal(void)//参考上方fork代码写出可用文件描述符数量计算函数
+{
+  uint64 cnt = 0;
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  for(int i = 0; i < NOFILE; i++){
+    if(p->ofile[i] == 0){
+      cnt++;
+    }
+  }
+  release(&p->lock);
+  return cnt;
+}

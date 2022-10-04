@@ -80,3 +80,18 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+
+uint64
+mem_cal(void)//仿照上方代码书写内存空间计算代码
+{
+  uint64 cnt = 0;
+  acquire(&kmem.lock);
+  struct run *mem_space = kmem.freelist;
+  while(mem_space){
+    mem_space = mem_space->next;
+    cnt++;
+  }
+  release(&kmem.lock);
+  return cnt*PGSIZE;
+}

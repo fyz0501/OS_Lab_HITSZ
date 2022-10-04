@@ -107,6 +107,8 @@ extern uint64 sys_uptime(void);
 
 extern uint64 sys_trace(void);
 
+extern uint64 sys_sysinfo(void); 
+
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
 [SYS_exit]    sys_exit,
@@ -129,13 +131,16 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
-
 [SYS_trace]   sys_trace,
+[SYS_sysinfo] sys_sysinfo,
 };
 
 // 添加一个系统调用名字的数组，使每个系统调用都可以输出信息
 static char *syscall_names[] = {
-  [SYS_fork]    "fork",
+  // "sys_fork", "sys_exit", "sys_wait", "sys_pipe", "sys_read", "sys_kill", "sys_exec", 
+  // "sys_fstat","sys_chdir", "sys_dup", "sys_getpid", "sys_sbrk", "sys_sleep", "sys_uptime", 
+  // "sys_open", "sys_write","sys_mknod", "sys_unlink", "sys_link", "sys_mkdir", "sys_close", "sys_trace","sys_sysinfo"
+   [SYS_fork]    "fork",
   [SYS_exit]    "exit",
   [SYS_wait]    "wait",
   [SYS_pipe]    "pipe",
@@ -157,7 +162,10 @@ static char *syscall_names[] = {
   [SYS_mkdir]   "mkdir",
   [SYS_close]   "close",
   [SYS_trace]   "trace",
-// [SYS_sysinfo] "sysinfo",
+  [SYS_sysinfo] "sysinfo",
+  //  "fork", "exit", "wait", "pipe", "read", "kill", "exec", 
+  // "fstat","chdir", "dup", "getpid", "sbrk", "sleep", "uptime", 
+  // "open", "write","mknod", "unlink", "link", "mkdir", "close", "trace","sysinfo"
 };
 
 
