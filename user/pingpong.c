@@ -22,6 +22,7 @@ int main(int argc,char* argv[]){
         close(p2[1]);//关闭管道2的写端口
         write(p1[1],"ping",strlen("ping"));
         close(p1[1]);//写入完成，关闭管道1的写端口
+        wait(0);
         if (read(p2[0],temp,5)>0){
             int father_pid = getpid();
             printf("%d: received %s\n",father_pid,temp);
