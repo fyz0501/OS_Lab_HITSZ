@@ -52,7 +52,6 @@ freerange(void *pa_start, void *pa_end)
 
 // int init_cpuid;//定义初始的cpuid,令这个id在0~NCPU-1的范围内循环迭代，使得各个cpu对应的
 //                   //freelist能够分配到相对平均的内存空间
-// int flag = 0;
 void
 kfree(void *pa)
 {
