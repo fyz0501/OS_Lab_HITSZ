@@ -65,10 +65,10 @@ bhash(uint blockno){
   return hash_res;
 }
 
-//从桶i中找到空闲的缓存
+//从桶i中找到空闲的缓存,查找的方向是逆向查找
 static struct buf*
 bfind(uint i){
-  for(struct buf *b = bcache.hashbucket[i].next;b!=&bcache.hashbucket[i]; b = b->next){
+  for(struct buf *b = bcache.hashbucket[i].prev;b!=&bcache.hashbucket[i]; b = b->prev){
     if(b->refcnt == 0){
       b->prev->next = b->next;
       b->next->prev = b->prev;
@@ -90,6 +90,7 @@ bget(uint dev, uint blockno)
   acquire(&bcache.lock[i]);
 
   // Is the block already cached?
+  // 顺序查找是否命中
   for(b = bcache.hashbucket[i].next; b != &bcache.hashbucket[i]; b = b->next){
     if(b->dev == dev && b->blockno == blockno){
       b->refcnt++;
