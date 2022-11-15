@@ -21,6 +21,7 @@ main()
     printf("\n");
     kinit();         // physical page allocator
     kvminit();       // create kernel page table
+    printf("????");
     kvminithart();   // turn on paging
     procinit();      // process table
     trapinit();      // trap vectors
@@ -48,5 +49,6 @@ main()
     plicinithart();   // ask PLIC for device interrupts
   }
 
-  scheduler();        
+  scheduler(); 
+      printf("!!!!!!");       
 }

@@ -8,7 +8,7 @@
 #include "elf.h"
 
 static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
-
+void vmprint(pagetable_t pgtbl, int depth);
 int
 exec(char *path, char **argv)
 {
@@ -63,10 +63,10 @@ exec(char *path, char **argv)
 
   p = myproc();
   uint64 oldsz = p->sz;
-
   // Allocate two pages at the next page boundary.
   // Use the second as the user stack.
   sz = PGROUNDUP(sz);
+
   uint64 sz1;
   if((sz1 = uvmalloc(pagetable, sz, sz + 2*PGSIZE)) == 0)
     goto bad;
@@ -111,11 +111,19 @@ exec(char *path, char **argv)
   // Commit to the user image.
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
+    
   p->sz = sz;
+
+  // 清空原进程内核页表的映射
+  pvmclear(p->k_pagetable, oldsz, 0);
+  // 复制新的内核页表并建立映射
+  pvmcopy(p->pagetable, p->k_pagetable, 0, p->sz);
+
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
-
+  if(p->pid == 1)
+    vmprint(p->pagetable, 0);
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
@@ -155,3 +163,4 @@ loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz
   
   return 0;
 }
+

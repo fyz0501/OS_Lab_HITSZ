@@ -40,6 +40,7 @@ procinit(void)
       uint64 va = KSTACK((int) (p - proc));
       kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
       p->kstack = va;
+      p->kstack_pa = (uint64)pa;  //将内核栈的物理地址pa拷贝到kstack_pa中
   }
   kvminithart();
 }
@@ -113,13 +114,23 @@ found:
     return 0;
   }
 
-  // An empty user page table.
+  // 为进程创建内核页表并完成映射
+  p->k_pagetable = pvminit();
+  if(p->k_pagetable == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+ // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
     freeproc(p);
     release(&p->lock);
     return 0;
   }
+  pvmmap(p->k_pagetable, p->kstack, (uint64)p->kstack_pa, PGSIZE, PTE_R | PTE_W);
+
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
@@ -129,6 +140,27 @@ found:
 
   return p;
 }
+
+
+// 模仿freewalk函数所写出的释放进程内核页表方法
+void
+p_freewalk(pagetable_t proc_pagetable)
+{
+  // there are 2^9 = 512 PTEs in a page table.
+  for(int i = 0; i < 512; i++){
+    pte_t pte = proc_pagetable[i];
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      p_freewalk((pagetable_t)child);
+      proc_pagetable[i] = 0;  
+    } else if(pte & PTE_V){
+      proc_pagetable[i] = 0;  // 释放指向叶子页表的指针
+    }
+  }
+  kfree((void*)proc_pagetable);
+}
+
 
 // free a proc structure and the data hanging from it,
 // including user pages.
@@ -141,6 +173,8 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  if(p->k_pagetable)
+    p_freewalk(p->k_pagetable);
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -150,6 +184,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  // p->pcb_mask = 0;//reset pcb_mask
 }
 
 // Create a user page table for a given process,
@@ -221,6 +257,9 @@ userinit(void)
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+  // 将第一个进程的用户页表映射到内核页表中
+  pvmcopy(p->pagetable, p->k_pagetable, 0, p->sz);
+
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -246,8 +285,10 @@ growproc(int n)
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    pvmcopy(p->pagetable, p->k_pagetable, p->sz, sz);
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    sz = uvmdealloc(p->pagetable, sz, sz + n);  // sz是缩减之后的地址，相当于newsz，newsz < oldsz
+    pvmclear(p->k_pagetable, p->sz, sz);  // 解除进程内核页表的映射
   }
   p->sz = sz;
   return 0;
@@ -273,6 +314,14 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+
+  // 将子进程的用户页表复制到子进程的内核页表中
+  if(pvmcopy(np->pagetable, np->k_pagetable, 0, p->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+
   np->sz = p->sz;
 
   np->parent = p;
@@ -294,6 +343,8 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
+  //将pcb_mask信息传给子进程
+  // np->pcb_mask = p->pcb_mask;
 
   release(&np->lock);
 
@@ -458,7 +509,6 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
@@ -473,24 +523,21 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        pvminithart(p->k_pagetable);  // 切换至进程的内核页表
         swtch(&c->context, &p->context);
-
+        kvminithart();  // 无进程运行，切回至全局内核页表 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-        c->proc = 0; // cpu dosen't run any process now
-
+        c->proc = 0;
+        
         found = 1;
       }
       release(&p->lock);
     }
-#if !defined (LAB_FS)
     if(found == 0) {
       intr_on();
       asm volatile("wfi");
     }
-#else
-    ;
-#endif
   }
 }
 
@@ -696,4 +743,35 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+uint64
+proc_cal(void)//参考上方allocproc代码写出空闲进程数量计算函数
+{
+  uint64 cnt = 0;
+  struct proc *p;
+  for(p = proc;p<&proc[NPROC];p++){
+    acquire(&p->lock);
+    if(p->state == UNUSED){
+      cnt++;
+    }
+    release(&p->lock);
+  }
+  return cnt;
+}
+
+
+uint64
+fd_cal(void)//参考上方fork代码写出可用文件描述符数量计算函数
+{
+  uint64 cnt = 0;
+  struct proc *p = myproc();
+  acquire(&p->lock);
+  for(int i = 0; i < NOFILE; i++){  
+    if(p->ofile[i] == 0){
+      cnt++;
+    }
+  }
+  release(&p->lock);
+  return cnt;
 }
