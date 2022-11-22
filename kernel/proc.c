@@ -121,6 +121,8 @@ found:
     release(&p->lock);
     return 0;
   }
+  // 为内核栈添加映射
+  pvmmap(p->k_pagetable, p->kstack, (uint64)p->kstack_pa, PGSIZE, PTE_R | PTE_W);
 
  // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -129,7 +131,7 @@ found:
     release(&p->lock);
     return 0;
   }
-  pvmmap(p->k_pagetable, p->kstack, (uint64)p->kstack_pa, PGSIZE, PTE_R | PTE_W);
+
 
 
   // Set up new context to start executing at forkret,
